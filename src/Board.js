@@ -8,7 +8,7 @@ export default function Board(props) {
     const [ctx, setCtx] = useState(null);
     const [isDrawing, setIsDrawing] = useState(false)
 
-    const socket = io("http://localhost:3001", {
+    const socket = io("https://socket-paint-server.herokuapp.com/", {
         withCredentials: true,
         transports: ['websocket', 'polling']
     });
