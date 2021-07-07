@@ -1,4 +1,4 @@
-# Getting Started with Create React App
+# Socket Paint Cient
 
 ### Viewable at: https://ankityande.github.io/socket-paint-client/
 
