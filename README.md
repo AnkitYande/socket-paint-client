@@ -6,4 +6,6 @@ This project uses socket.io to create a collaborative whiteboard that many usere
 
 Backend viewable at: https://github.com/AnkitYande/socket-paint-server
 
+Inspiration: https://github.com/satansdeer/drawing-react-canvas 
+
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
