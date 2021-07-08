@@ -50,7 +50,7 @@ export default function Board(props) {
     }, [props.buttonToggle]);
 
     useEffect(() => {
-        if (socket) {
+        if (socket && !isDrawing) {
             // console.log("getting data")
             socket.on("canvas-data", (data) => {
                 var img = new Image();
@@ -59,7 +59,7 @@ export default function Board(props) {
                     ctx.drawImage(img, 0, 0);
             })
         }
-    }, [socket])
+    }, [socket, isDrawing])
 
     useEffect(() => {
         if (props.room) changeRoom();
@@ -85,6 +85,10 @@ export default function Board(props) {
     const finishDrawing = () => {
         ctx.closePath();
         setIsDrawing(false);
+        const base64Img = canvasRef.current.toDataURL("image/png")
+        if (socket) {
+            socket.emit("canvas-data", base64Img, props.room);
+        }
     };
 
     const draw = ({ nativeEvent }) => {
@@ -94,11 +98,6 @@ export default function Board(props) {
         const { offsetX, offsetY } = nativeEvent;
         ctx.lineTo(offsetX, offsetY);
         ctx.stroke();
-
-        const base64Img = canvasRef.current.toDataURL("image/png")
-        if (socket) {
-            socket.emit("canvas-data", base64Img, props.room);
-        }
     };
 
     const init = () => {

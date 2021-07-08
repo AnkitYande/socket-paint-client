@@ -6,33 +6,56 @@ export default function Board(props) {
 
     const canvasRef = useRef(null);
     const [ctx, setCtx] = useState(null);
-    const [isDrawing, setIsDrawing] = useState(false)
-    const [socket, setSocket] = useState(null)
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [socket, setSocket] = useState(null);
+
 
     window.onpopstate = () => {
-        if (socket) socket.disconnect();
+        socket.disconnect();
     }
 
-    const changeRoom = (room) => {
-        if (socket && room) {
-            socket.emit('join-room', room, (message) => {
+    const changeRoom = () => {
+        if (socket && props.room) {
+            socket.emit('join-room', props.room, (message) => {
                 alert(message)
             })
         }
+        init();
+        return () => { socket.disconnect(); }
     }
 
+    //init
     useEffect(() => {
         init();
-        const socketTemp = io("http://localhost:3001", {
+        const socketTemp = io("https://socket-paint-server.herokuapp.com/", {
             withCredentials: true,
             transports: ['websocket', 'polling']
         });
-        setSocket(socketTemp)
+        setSocket(socketTemp);
     }, []);
 
+    //recieve reset
     useEffect(() => {
-        if (socket) {
-            console.log("getting data")
+        if(socket)
+            socket.on("clear-canvas", () => {
+                // console.log("clearing!!!")
+                if (ctx)
+                    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+            })
+    }, [socket]);
+    
+    //send reset
+    useEffect(() => {
+        console.log("reset")
+        if (ctx) {
+            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+            socket.emit("clear-canvas", props.room);
+        }
+    }, [props.buttonToggle]);
+
+    useEffect(() => {
+        if (socket && !isDrawing) {
+            // console.log("getting data")
             socket.on("canvas-data", (data) => {
                 var img = new Image();
                 img.src = data;
@@ -40,10 +63,10 @@ export default function Board(props) {
                     ctx.drawImage(img, 0, 0);
             })
         }
-    }, [socket])
+    }, [socket, isDrawing])
 
     useEffect(() => {
-        if (props.room) changeRoom(props.room);
+        if (props.room) changeRoom();
     }, [props.room]);
 
     useEffect(() => {
@@ -66,6 +89,10 @@ export default function Board(props) {
     const finishDrawing = () => {
         ctx.closePath();
         setIsDrawing(false);
+        const base64Img = canvasRef.current.toDataURL("image/png")
+        if (socket) {
+            socket.emit("canvas-data", base64Img, props.room);
+        }
     };
 
     const draw = ({ nativeEvent }) => {
@@ -75,20 +102,15 @@ export default function Board(props) {
         const { offsetX, offsetY } = nativeEvent;
         ctx.lineTo(offsetX, offsetY);
         ctx.stroke();
-
-        const base64Img = canvasRef.current.toDataURL("image/png")
-        if (socket) {
-            socket.emit("canvas-data", base64Img, props.room);
-        }
     };
 
     const init = () => {
         const canvas = canvasRef.current
         if (canvas) {
-            canvas.width = window.innerWidth * 0.9;
-            canvas.height = window.innerHeight * 0.8;
-            canvas.style.width = `${window.innerWidth * 0.9}px`;
-            canvas.style.height = `${window.innerHeight * 0.8}px`;
+            canvas.width = window.innerWidth * 0.8;
+            canvas.height = window.innerHeight * 0.75;
+            canvas.style.width = `${window.innerWidth * 0.8}px`;
+            canvas.style.height = `${window.innerHeight * 0.75}px`;
 
             let context = canvas.getContext("2d");
             context.lineCap = "round";
