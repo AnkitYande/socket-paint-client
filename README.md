@@ -1,10 +1,11 @@
 # Socket Paint Cient
 
+### View at: https://ankityande.github.io/socket-paint-client/
+
 This project uses socket.io to create a collaborative whiteboard that many useres can view and edit in real time
 ```diff
 - NOTE: The backend of this webpage is no longer active as Heroku ended their free tier
 ```
-### Viewable at: https://ankityande.github.io/socket-paint-client/
 
 Backend viewable at: https://github.com/AnkitYande/socket-paint-server
 
