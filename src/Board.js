@@ -1,123 +1,123 @@
-import React, { useRef, useState, useEffect } from "react";
-import io from "socket.io-client"
-import './App.css';
+import React, { useRef, useEffect, useState } from "react";
+import io from "socket.io-client";
+import "./App.css";
 
-export default function Board(props) {
+// Initialize Socket connection
+const socket = 
+io("http://localhost:3001", {
+    withCredentials: true,
+    transports: ["websocket", "polling"],
+});
 
+export default function Board({ room, size, color, buttonToggle }) {
     const canvasRef = useRef(null);
     const [ctx, setCtx] = useState(null);
-    const [isDrawing, setIsDrawing] = useState(false)
+    const [isDrawing, setIsDrawing] = useState(false);
+    let lastX, lastY;
 
-    const socket = io("https://socket-paint-server.herokuapp.com/", {
-        withCredentials: true,
-        transports: ['websocket', 'polling']
-    });
-    socket.emit('join-room', props.room, (message) => {
-        // alert(message)
-    })
-
-
-    socket.on("clear-canvas", () => {
-        // console.log("clearing!!!")
-        if (ctx)
-            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    })
-
-    window.onpopstate = () => {
-        socket.disconnect();
-    }
-
-    const changeRoom = () => {
-        if (socket && props.room) {
-            socket.emit('join-room', props.room, (message) => {
-                alert(message)
-            })
-        }
-        init();
-        return () => { socket.disconnect(); }
-    }
-
+    // On Init
     useEffect(() => {
-        init();
+        const canvas = canvasRef.current;
+        if (canvas) {
+            setupCanvas(canvas);
+        }
     }, []);
 
+    // On Room Change
     useEffect(() => {
-        console.log("reset")
+        if (room) {
+            socket.emit("join-room", room);
+            clearCanvas();
+            socket.emit("request-canvas", room);
+        }
+    }, [room]);
+
+    // On Canvas Context Change
+    useEffect(() => {
+        const handleDrawData = ({ x, y, lastX, lastY, color, size }) => drawLine(lastX, lastY, x, y, color, size);
+        const handleLoadCanvas = (dataUrl) => loadCanvas(dataUrl);
+        const handleClearCanvas = () => clearCanvas();
+
+        socket.on("draw-data", handleDrawData);
+        socket.on("load-canvas", handleLoadCanvas);
+        socket.on("clear-canvas", handleClearCanvas);
+
+        return () => {
+            socket.off("draw-data", handleDrawData);
+            socket.off("load-canvas", handleLoadCanvas);
+            socket.off("clear-canvas", handleClearCanvas);
+        };
+    }, [ctx]);
+
+    // On Clear Btn Press
+    useEffect(() => {
         if (ctx) {
-            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-            socket.emit("clear-canvas", props.room);
+            clearCanvas();
+            socket.emit("clear-canvas", room);
         }
-    }, [props.buttonToggle]);
-
-    useEffect(() => {
-        if (socket && !isDrawing) {
-            // console.log("getting data")
-            socket.on("canvas-data", (data) => {
-                var img = new Image();
-                img.src = data;
-                if (ctx)
-                    ctx.drawImage(img, 0, 0);
-            })
-        }
-    }, [socket, isDrawing])
-
-    useEffect(() => {
-        if (props.room) changeRoom();
-    }, [props.room]);
-
-    useEffect(() => {
-        if (ctx)
-            ctx.lineWidth = props.size;
-    }, [props.size, ctx])
-    useEffect(() => {
-        if (ctx)
-            ctx.strokeStyle = props.color;
-    }, [props.color, ctx])
+    }, [buttonToggle]);
 
 
-    const startDrawing = ({ nativeEvent }) => {
-        const { offsetX, offsetY } = nativeEvent;
+    /*
+     * Canvas Helper Functions
+     */
+
+    const setupCanvas = (canvas) => {
+        canvas.width = window.innerWidth * 0.8;
+        canvas.height = window.innerHeight * 0.75;
+        canvas.style.width = `${window.innerWidth * 0.8}px`;
+        canvas.style.height = `${window.innerHeight * 0.75}px`;
+        const context = canvas.getContext("2d");
+        context.lineCap = "round";
+        setCtx(context);
+    };
+
+    const drawLine = (x1, y1, x2, y2, strokeColor, lineWidth) => {
+        if (!ctx) return;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = lineWidth;
         ctx.beginPath();
-        ctx.moveTo(offsetX, offsetY);
-        setIsDrawing(true);
-    };
-
-    const finishDrawing = () => {
-        ctx.closePath();
-        setIsDrawing(false);
-        const base64Img = canvasRef.current.toDataURL("image/png")
-        if (socket) {
-            socket.emit("canvas-data", base64Img, props.room);
-        }
-    };
-
-    const draw = ({ nativeEvent }) => {
-        if (!isDrawing) {
-            return;
-        }
-        const { offsetX, offsetY } = nativeEvent;
-        ctx.lineTo(offsetX, offsetY);
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
         ctx.stroke();
     };
 
-    const init = () => {
-        const canvas = canvasRef.current
-        if (canvas) {
-            canvas.width = window.innerWidth * 0.8;
-            canvas.height = window.innerHeight * 0.75;
-            canvas.style.width = `${window.innerWidth * 0.8}px`;
-            canvas.style.height = `${window.innerHeight * 0.75}px`;
+    const loadCanvas = (dataUrl) => {
+        if (!ctx) return;
+        let img = new Image();
+        img.src = dataUrl;
+        img.onload = () => ctx.drawImage(img, 0, 0);
+    };
 
-            let context = canvas.getContext("2d");
-            context.lineCap = "round";
-            // context.scale(2,2);
-            context.strokeStyle = props.color;
-            context.lineWidth = props.size;
-            setCtx(context);
-        }
-    }
+    const clearCanvas = () => {
+        if (!ctx) return;
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    };
 
-    window.addEventListener('resize', init);
+
+    /*
+    * Handles user drawing interactions:
+    */
+    const startDrawing = ({ nativeEvent }) => {
+        const { offsetX, offsetY } = nativeEvent;
+        setIsDrawing(true);
+        lastX = offsetX;
+        lastY = offsetY;
+    };
+
+    const finishDrawing = () => {
+        setIsDrawing(false);
+        socket.emit("save-canvas", { room, dataUrl: canvasRef.current.toDataURL("image/png") });
+    };
+
+    const draw = ({ nativeEvent }) => {
+        if (!isDrawing) return;
+        const { offsetX, offsetY } = nativeEvent;
+        drawLine(lastX, lastY, offsetX, offsetY, color, size);
+        socket.emit("draw-data", { x: offsetX, y: offsetY, lastX, lastY, color, size, room });
+        lastX = offsetX;
+        lastY = offsetY;
+    };
 
     return (
         <canvas
@@ -125,7 +125,7 @@ export default function Board(props) {
             onMouseUp={finishDrawing}
             onMouseMove={draw}
             ref={canvasRef}
-            class="canvas"
+            className="canvas"
         />
-    )
+    );
 }
