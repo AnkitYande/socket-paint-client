@@ -4,7 +4,8 @@ import "./App.css";
 
 // Initialize Socket connection
 const socket = 
-io("http://localhost:3001", {
+// io("http://localhost:3001", {
+io("https://socket-paint-server.onrender.com", {
     withCredentials: true,
     transports: ["websocket", "polling"],
 });
